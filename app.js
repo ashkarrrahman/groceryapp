@@ -234,165 +234,149 @@
 
     // Top bar: back + pause.
     screen.appendChild(el('div', { class: 'topbar' }, [
-      el('button', { class: 'btn-ghost', style: 'border:none;padding:0 8px', 'aria-label': 'Back', onClick: stepBack, html: '← Back' }),
-      el('button', { class: 'icon-btn', 'aria-label': 'Pause and save', onClick: pauseSession, html: '⏸' })
+      el('button', { class: 'btn-ghost', style: 'border:none;padding:0 8px', 'aria-label': 'Back', onClick: prevCategory, html: '← Back' }),
+      el('button', { class: 'icon-btn', 'aria-label': 'Pause and save', onClick: () => pauseSession(), html: '⏸' })
     ]));
 
-    // Progress.
-    const total = App.session.items.length;
-    const idx = App.session.currentIndex;
+    if (typeof App.session.currentCategory !== 'number') App.session.currentCategory = 0;
+    const cats = Session.categoriesOf(App.session.items);
+
+    // Progress (category-based).
     screen.appendChild(el('div', { class: 'progress-wrap' }, [
-      el('div', { class: 'progress-track', role: 'progressbar', 'aria-valuenow': String(idx), 'aria-valuemin': '0', 'aria-valuemax': String(total) }, [
+      el('div', { class: 'progress-track', role: 'progressbar', 'aria-valuenow': String(App.session.currentCategory), 'aria-valuemin': '0', 'aria-valuemax': String(cats.length) }, [
         el('div', { class: 'progress-fill', id: 'progress-fill' })
       ]),
       el('div', { class: 'progress-labels' }, [
-        el('span', { id: 'progress-count', text: 'Item ' + Math.min(idx + 1, total) + ' of ' + total }),
+        el('span', { id: 'progress-count' }),
         el('span', { id: 'progress-cat' })
       ])
     ]));
 
     screen.appendChild(el('div', { id: 'item-mount' }));
-    renderItem('in-right');
+    renderCategory('in-right');
   }
 
-  function renderItem(animClass) {
+  // Indices into session.items for every item in the named category.
+  function categoryItemIndices(items, cat) {
+    const out = [];
+    items.forEach((it, i) => { if (it.category === cat) out.push(i); });
+    return out;
+  }
+
+  function renderCategory(animClass) {
     const session = App.session;
-    if (session.currentIndex >= session.items.length) { finishSession(); return; }
+    const cats = Session.categoriesOf(session.items);
+    if (session.currentCategory >= cats.length) { finishSession(); return; }
+    const cat = cats[session.currentCategory];
+
+    // Progress.
+    const pct = (session.currentCategory / cats.length) * 100;
+    requestAnimationFrame(() => { const f = $('#progress-fill'); if (f) f.style.width = pct + '%'; });
+    const countLabel = $('#progress-count'); if (countLabel) countLabel.textContent = 'Category ' + (session.currentCategory + 1) + ' of ' + cats.length;
+    const catLabel = $('#progress-cat'); if (catLabel) catLabel.textContent = cat;
+    const track = document.querySelector('[role="progressbar"]'); if (track) track.setAttribute('aria-valuenow', String(session.currentCategory));
 
     const mount = $('#item-mount');
     mount.innerHTML = '';
-    const item = session.items[session.currentIndex];
-
-    // Progress bar width + category label.
-    const pct = (session.currentIndex / session.items.length) * 100;
-    requestAnimationFrame(() => { const f = $('#progress-fill'); if (f) f.style.width = pct + '%'; });
-    const catLabel = $('#progress-cat'); if (catLabel) catLabel.textContent = item.category;
-    const countLabel = $('#progress-count'); if (countLabel) countLabel.textContent = 'Item ' + (session.currentIndex + 1) + ' of ' + session.items.length;
-    const track = document.querySelector('[role="progressbar"]'); if (track) track.setAttribute('aria-valuenow', String(session.currentIndex));
-
     const card = el('div', { class: 'item-card ' + animClass });
 
-    // Category pill.
-    const pill = el('div', { class: 'category-pill', html: '\u{1F9FA} ' + item.category });
+    // Category header pill (flashes briefly on change).
+    const pill = el('div', { class: 'category-pill flash', html: '\u{1F9FA} ' + cat });
     card.appendChild(pill);
+    setTimeout(() => pill.classList.remove('flash'), 350);
 
-    // Item name + prefill hint.
-    card.appendChild(el('div', { class: 'item-name', text: item.item }));
-    if (item.prefilled) {
-      card.appendChild(el('div', { class: 'prefill-hint', html: '\u{1F550} Pre-filled from last time' }));
-    }
+    const indices = categoryItemIndices(session.items, cat);
+    card.appendChild(el('div', { class: 'cat-hint muted', text: 'Tick the items you need, then set brand & quantity.' }));
 
-    // Brand.
-    card.appendChild(el('div', { class: 'field' }, [
-      el('label', { text: 'Brand', for: 'in-brand' }),
-      el('input', { type: 'text', id: 'in-brand', value: item.brand || '', placeholder: 'e.g. Samba', 'aria-label': 'Brand' })
+    indices.forEach(i => card.appendChild(renderItemRow(session.items[i], i)));
+
+    const last = session.currentCategory === cats.length - 1;
+    card.appendChild(el('div', { class: 'cat-actions' }, [
+      el('button', { class: 'btn-primary', html: last ? 'Finish →' : 'Next category →', onClick: nextCategory }),
+      el('button', { class: 'btn-ghost skip-cat', text: 'Skip entire category', onClick: skipCategory })
     ]));
-
-    // Quantity + unit.
-    card.appendChild(el('div', { class: 'field' }, [
-      el('label', { text: 'Quantity', for: 'in-qty' }),
-      el('div', { class: 'qty-row' }, [
-        el('input', { type: 'text', id: 'in-qty', class: 'qty', value: item.quantity || '', placeholder: '5', inputmode: 'decimal', 'aria-label': 'Quantity' }),
-        el('input', { type: 'text', id: 'in-unit', class: 'unit', value: item.unit || '', placeholder: 'kg', 'aria-label': 'Unit' })
-      ])
-    ]));
-
-    // Note.
-    card.appendChild(el('div', { class: 'field' }, [
-      el('textarea', { class: 'note-input', id: 'in-note', placeholder: 'Add a note...', 'aria-label': 'Note', text: item.note || '' })
-    ]));
-
-    // Actions.
-    card.appendChild(el('div', { class: 'action-row' }, [
-      el('button', { class: 'btn-ghost', text: 'Skip', onClick: () => advance('skipped') }),
-      el('button', { class: 'btn-warning', text: 'Out of stock', onClick: () => advance('out_of_stock') }),
-      el('button', { class: 'btn-next', html: 'Next →', onClick: () => advance('done') })
-    ]));
-    card.appendChild(el('button', { class: 'btn-ghost skip-cat', text: 'Skip entire category', onClick: skipCategory }));
 
     mount.appendChild(card);
-
-    // Flash the pill on category change.
-    const prev = session.items[session.currentIndex - 1];
-    if (!prev || prev.category !== item.category) {
-      pill.classList.add('flash');
-      setTimeout(() => pill.classList.remove('flash'), 350);
-    }
-
-    // Focus the brand input for fast entry.
-    setTimeout(() => { const b = $('#in-brand'); if (b) b.focus(); }, 60);
+    window.scrollTo(0, 0);
   }
 
-  function readInputs() {
-    return {
-      brand: ($('#in-brand') || {}).value || '',
-      quantity: ($('#in-qty') || {}).value || '',
-      unit: ($('#in-unit') || {}).value || '',
-      note: ($('#in-note') || {}).value || ''
-    };
+  function renderItemRow(item, idx) {
+    // Include if previously chosen, or a fresh pre-filled item.
+    const include = item.status === 'done' || (item.status === 'pending' && item.prefilled);
+
+    const checkbox = el('input', { type: 'checkbox', class: 'ci-include', 'aria-label': 'Include ' + item.item });
+    if (include) checkbox.checked = true;
+
+    const brand = el('input', { type: 'text', class: 'ci-brand', value: item.brand || '', placeholder: 'Brand', 'aria-label': item.item + ' brand' });
+    const qty = el('input', { type: 'text', class: 'ci-qty', value: item.quantity || '', placeholder: 'Qty', inputmode: 'decimal', 'aria-label': item.item + ' quantity' });
+    const unit = el('input', { type: 'text', class: 'ci-unit', value: item.unit || '', placeholder: 'Unit', 'aria-label': item.item + ' unit' });
+
+    const row = el('div', { class: 'cat-item' }, [
+      el('div', { class: 'ci-top' }, [
+        checkbox,
+        el('div', { class: 'ci-name' + (item.prefilled ? ' prefilled' : ''), text: item.item })
+      ]),
+      el('div', { class: 'ci-fields' }, [ brand, qty, unit ])
+    ]);
+    row.dataset.idx = String(idx);
+
+    // Typing into any field auto-includes the item.
+    [brand, qty, unit].forEach(inp => inp.addEventListener('input', () => { checkbox.checked = true; }));
+
+    return row;
   }
 
-  function advance(status) {
+  // Read the current category's rows back into the session items.
+  function saveCurrentCategory() {
     const session = App.session;
-    const item = session.items[session.currentIndex];
-    const vals = readInputs();
-
-    if (status === 'done') {
-      if (!vals.brand && !vals.quantity && !vals.note) {
-        toast('Add a brand or quantity, or use Skip');
-        return;
+    document.querySelectorAll('.cat-item').forEach(row => {
+      const i = +row.dataset.idx;
+      const item = session.items[i];
+      item.brand = row.querySelector('.ci-brand').value.trim();
+      item.quantity = row.querySelector('.ci-qty').value.trim();
+      item.unit = row.querySelector('.ci-unit').value.trim();
+      if (row.querySelector('.ci-include').checked) {
+        item.status = 'done';
+        Storage.updatePrefill(item.item, item);
+      } else {
+        item.status = 'skipped';
       }
-      Object.assign(item, vals);
-      item.status = 'done';
-      Storage.updatePrefill(item.item, item);
-    } else if (status === 'out_of_stock') {
-      item.note = vals.note;
-      item.status = 'out_of_stock';
-    } else {
-      item.note = vals.note;
-      item.status = 'skipped';
-    }
+    });
+  }
 
-    session.currentIndex++;
+  function nextCategory() {
+    const session = App.session;
+    saveCurrentCategory();
+    session.currentCategory++;
     Session.persist(session);
+    const cats = Session.categoriesOf(session.items);
+    if (session.currentCategory >= cats.length) { finishSession(); return; }
+    renderCategory('in-right');
+  }
 
-    if (session.currentIndex >= session.items.length) { finishSession(); return; }
-    renderItem('in-right');
+  function prevCategory() {
+    const session = App.session;
+    saveCurrentCategory();
+    if (session.currentCategory === 0) { pauseSession(true); return; }
+    session.currentCategory--;
+    Session.persist(session);
+    renderCategory('in-left');
   }
 
   function skipCategory() {
     const session = App.session;
-    const cat = session.items[session.currentIndex].category;
-    let i = session.currentIndex;
-    while (i < session.items.length && session.items[i].category === cat) {
-      if (session.items[i].status === 'pending') session.items[i].status = 'skipped';
-      i++;
-    }
-    session.currentIndex = i;
+    const cats = Session.categoriesOf(session.items);
+    const cat = cats[session.currentCategory];
+    session.items.forEach(it => { if (it.category === cat) it.status = 'skipped'; });
+    session.currentCategory++;
     Session.persist(session);
-    if (session.currentIndex >= session.items.length) { finishSession(); return; }
-    renderItem('in-right');
+    if (session.currentCategory >= cats.length) { finishSession(); return; }
+    renderCategory('in-right');
   }
 
-  function stepBack() {
+  function pauseSession(skipSave) {
     const session = App.session;
-    if (session.currentIndex === 0) { pauseSession(); return; }
-    // Save current edits before stepping back so nothing is lost.
-    const cur = session.items[session.currentIndex];
-    if (cur) Object.assign(cur, { note: (($('#in-note') || {}).value || cur.note) });
-    session.currentIndex--;
-    Session.persist(session);
-    renderItem('in-left');
-  }
-
-  function pauseSession() {
-    // Persist current field edits onto the active item before leaving.
-    const session = App.session;
-    const cur = session.items[session.currentIndex];
-    if (cur && cur.status === 'pending') {
-      const vals = readInputs();
-      cur.brand = vals.brand; cur.quantity = vals.quantity; cur.unit = vals.unit; cur.note = vals.note;
-    }
+    if (!skipSave) saveCurrentCategory();
     Session.persist(session);
     toast('Session saved');
     navigate('/');
@@ -444,13 +428,9 @@
       const block = el('div', { class: 'cat-block' }, [ el('div', { class: 'cat-title', text: cat }) ]);
       visible.filter(i => i.category === cat).forEach(item => {
         const row = el('div', { class: 'summary-item' }, [ el('div', { class: 'name', text: item.item }) ]);
-        if (item.status === 'out_of_stock') {
-          row.appendChild(el('span', { class: 'oos-tag', text: 'Out of stock' }));
-        } else {
-          const qty = item.quantity ? (item.quantity + (item.unit ? ' ' + item.unit : '')) : '';
-          const detail = [item.brand, qty].filter(Boolean).join(' · ');
-          row.appendChild(el('div', { class: 'detail', text: detail || '—' }));
-        }
+        const qty = item.quantity ? (item.quantity + (item.unit ? ' ' + item.unit : '')) : '';
+        const detail = [item.brand, qty].filter(Boolean).join(' · ');
+        row.appendChild(el('div', { class: 'detail', text: detail || '—' }));
         block.appendChild(row);
       });
       screen.appendChild(block);
@@ -589,8 +569,7 @@
       cats.forEach(cat => {
         body.appendChild(el('div', { class: 'cat-title', style: 'text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;margin:10px 0 6px', text: cat }));
         visible.filter(i => i.category === cat).forEach(item => {
-          const detail = item.status === 'out_of_stock' ? 'Out of stock'
-            : [item.brand, item.quantity ? item.quantity + (item.unit ? ' ' + item.unit : '') : ''].filter(Boolean).join(' · ') || '—';
+          const detail = [item.brand, item.quantity ? item.quantity + (item.unit ? ' ' + item.unit : '') : ''].filter(Boolean).join(' · ') || '—';
           body.appendChild(el('div', { class: 'summary-item' }, [
             el('div', { class: 'name', text: item.item }),
             el('div', { class: 'detail', text: detail })

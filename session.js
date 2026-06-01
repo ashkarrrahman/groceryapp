@@ -31,7 +31,7 @@ const Session = (function () {
     });
     return {
       startedAt: todayISO(),
-      currentIndex: 0,
+      currentCategory: 0,
       items
     };
   }
@@ -44,7 +44,7 @@ const Session = (function () {
 
   // Items that should appear in the summary / final list.
   function visibleItems(items) {
-    return items.filter(i => i.status === 'done' || i.status === 'out_of_stock');
+    return items.filter(i => i.status === 'done');
   }
 
   // Persist an in-progress session.

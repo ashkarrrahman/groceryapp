@@ -14,13 +14,9 @@ const Share = (function () {
         currentCat = item.category;
         lines.push('\n*' + currentCat + '*');
       }
-      if (item.status === 'out_of_stock') {
-        lines.push('❌ ' + item.item + ' — out of stock');
-      } else {
-        const qty = item.quantity ? (item.quantity + (item.unit ? ' ' + item.unit : '')) : '';
-        const detail = [item.brand, qty].filter(Boolean).join(' · ');
-        lines.push('• ' + item.item + (detail ? ' — ' + detail : ''));
-      }
+      const qty = item.quantity ? (item.quantity + (item.unit ? ' ' + item.unit : '')) : '';
+      const detail = [item.brand, qty].filter(Boolean).join(' · ');
+      lines.push('• ' + item.item + (detail ? ' — ' + detail : ''));
     });
     return lines.join('\n');
   }

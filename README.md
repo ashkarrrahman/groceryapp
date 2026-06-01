@@ -1,12 +1,12 @@
 # My Grocery List
 
-A personalised monthly grocery shopping **Progressive Web App (PWA)**. It reads your item list from a Google Sheet, walks you through each item one by one, remembers your previous brand/quantity choices, and produces a shareable WhatsApp or printable summary at the end.
+A personalised monthly grocery shopping **Progressive Web App (PWA)**. It reads your item list from a Google Sheet and walks you through it one category at a time — tick the items you need and set brand/quantity — remembers your previous choices, and produces a shareable WhatsApp or printable summary at the end.
 
 No backend, no login, no build step — just static HTML/CSS/JavaScript. Installable on iPhone and Android, and works fully offline in-store.
 
 ## Features
 
-- **Item-by-item flow** — step through each item, set brand + quantity, skip, mark out of stock, or skip a whole category.
+- **Category-at-a-time flow** — see all items in a category on one screen, tick the ones you need and set brand + quantity, then move to the next category (or skip a whole category).
 - **Remembers your choices** — pre-fills brand/quantity from your last session.
 - **Google Sheets as the source** — paste a sheet URL; the app fetches and caches it.
 - **Offline-first** — cached list + service worker so it works with no signal in the store.
