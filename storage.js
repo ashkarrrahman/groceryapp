@@ -1,5 +1,6 @@
 // Thin wrappers over localStorage with JSON encoding and safe defaults.
 const Storage = (function () {
+  const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_FC4DIk8tedSeP8XczQ2gOoFBbh42P6X8h4YdYA8XeI/edit?gid=0#gid=0';
   const KEYS = {
     settings: 'settings',
     cachedList: 'cachedList',
@@ -37,7 +38,7 @@ const Storage = (function () {
     KEYS,
 
     getSettings() {
-      return read(KEYS.settings, { userName: '', sheetUrl: '', theme: 'purple', lastFetched: null });
+      return read(KEYS.settings, { userName: '', sheetUrl: DEFAULT_SHEET_URL, theme: 'purple', lastFetched: null });
     },
     saveSettings(settings) {
       const merged = Object.assign(this.getSettings(), settings);
