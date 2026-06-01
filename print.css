@@ -1,0 +1,21 @@
+@media print {
+  body { background: #fff; color: #000; }
+  #app { max-width: none; }
+
+  /* Hide everything except the summary list. */
+  .screen { display: none !important; }
+  #screen-summary.active { display: block !important; padding: 0; }
+
+  .topbar, .summary-actions, .icon-btn, button, .banner, #toast, .overlay { display: none !important; }
+
+  .summary-head .check { display: none; }
+  .summary-head { margin-bottom: 16px; }
+
+  h1, h2, .item-name { color: #000; }
+  .cat-block .cat-title, .eyebrow { color: #000; }
+  .summary-item { border-bottom: 1px solid #ccc; }
+  .summary-item .detail { color: #000; }
+  .oos-tag { background: none; color: #000; border: 1px solid #000; }
+
+  @page { margin: 1.5cm; }
+}

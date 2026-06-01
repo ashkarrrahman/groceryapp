@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+
+# Local preview tooling (machine-specific paths)
+.claude/
