@@ -28,12 +28,17 @@ const Sheets = (function () {
     const lines = clean.split('\n');
     // Skip header row.
     const rows = lines.slice(1);
+    // Blank category cells inherit the category of the row above (sheets often
+    // label only the first row of each group), falling back to 'Uncategorised'.
+    let lastCategory = 'Uncategorised';
     return rows
       .map(line => {
         const cols = splitCSVLine(line);
         const [category, item, brand, quantity, unit] = cols;
+        const cat = (category || '').trim();
+        if (cat) lastCategory = cat;
         return {
-          category: (category || 'Uncategorised').trim(),
+          category: cat || lastCategory,
           item: (item || '').trim(),
           brand: (brand || '').trim(),
           quantity: (quantity || '').trim(),
