@@ -411,10 +411,10 @@
     // the shopping flow with selections intact; finalising happens on "Done".
     const dateStr = session._date || Session.todayISO();
 
-    // Re-enter the shopping flow at the last category so Back reaches earlier ones.
+    // Re-enter the shopping flow from the first category so you can walk
+    // through and finish the list from the start if needed.
     function editList() {
-      const cats = Session.categoriesOf(session.items);
-      session.currentCategory = Math.max(0, cats.length - 1);
+      session.currentCategory = 0;
       Session.persist(session);
       navigate('/shop');
     }
