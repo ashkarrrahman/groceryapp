@@ -211,7 +211,14 @@
     maybeOnboard();
   }
 
-  function startSession() {
+  async function startSession() {
+    const settings = Storage.getSettings();
+    // Online + sheet connected → pull the latest before starting.
+    // Offline (or fetch fails) → fall back to the cached list.
+    if (settings.sheetUrl && navigator.onLine) {
+      toast('Fetching latest list…');
+      await refreshFromSheet({ toast: false });
+    }
     const list = ensureList();
     if (!list.length) { toast('Your list is empty'); return; }
     App.session = Session.create(list, App.pendingTemplate);
