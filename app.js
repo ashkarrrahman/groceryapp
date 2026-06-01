@@ -211,7 +211,14 @@
     maybeOnboard();
   }
 
-  function startSession() {
+  async function startSession() {
+    const settings = Storage.getSettings();
+    // Online + sheet connected → pull the latest before starting.
+    // Offline (or fetch fails) → fall back to the cached list.
+    if (settings.sheetUrl && navigator.onLine) {
+      toast('Fetching latest list…');
+      await refreshFromSheet({ toast: false });
+    }
     const list = ensureList();
     if (!list.length) { toast('Your list is empty'); return; }
     App.session = Session.create(list, App.pendingTemplate);
@@ -393,20 +400,31 @@
     // Allow finishing either the live session or a just-completed one.
     let session = App.session || Storage.getActiveSession();
     if (!session) { navigate('/'); return; }
+    App.session = session;
 
     const screen = setScreen('screen-summary');
     screen.innerHTML = '';
 
     const visible = Session.visibleItems(session.items);
 
-    // Persist completion once (move active → history) if not already done.
-    if (!session._completed) {
-      const rec = Session.complete(session);
-      session._completed = true;
-      session._date = rec.completedAt;
-      App.session = session;
-    }
+    // The summary is a review step — it does NOT finalise. Editing returns to
+    // the shopping flow with selections intact; finalising happens on "Done".
     const dateStr = session._date || Session.todayISO();
+
+    // Re-enter the shopping flow at the last category so Back reaches earlier ones.
+    function editList() {
+      const cats = Session.categoriesOf(session.items);
+      session.currentCategory = Math.max(0, cats.length - 1);
+      Session.persist(session);
+      navigate('/shop');
+    }
+
+    // Finalise: write to history, clear active session, then go home.
+    function finishAndExit() {
+      Session.complete(session);
+      App.session = null;
+      navigate('/');
+    }
 
     screen.appendChild(el('div', { class: 'summary-head' }, [
       el('div', { class: 'check', html: '✓' }),
@@ -418,7 +436,8 @@
 
     if (!visible.length) {
       screen.appendChild(el('div', { class: 'empty-state', text: 'Nothing to display. You skipped all items.' }));
-      screen.appendChild(el('button', { class: 'btn-ghost', style: 'width:100%;margin-top:12px', text: 'Back to home', onClick: () => { App.session = null; navigate('/'); } }));
+      screen.appendChild(el('button', { class: 'btn-primary', style: 'width:100%;margin-top:12px', text: '← Edit list', onClick: editList }));
+      screen.appendChild(el('button', { class: 'btn-ghost', style: 'width:100%;margin-top:8px', text: 'Discard & home', onClick: () => { App.session = null; navigate('/'); } }));
       return;
     }
 
@@ -437,9 +456,10 @@
     });
 
     screen.appendChild(el('div', { class: 'summary-actions' }, [
+      el('button', { class: 'btn-ghost', style: 'width:100%', text: '← Edit list', onClick: editList }),
       el('button', { class: 'btn-green', html: '\u{1F7E2} Share via WhatsApp', onClick: () => Share.shareList(visible, dateStr) }),
       el('button', { class: 'btn-ghost', style: 'width:100%', html: '\u{1F5A8} Print', onClick: () => Share.printList() }),
-      el('button', { class: 'btn-ghost', style: 'width:100%', text: 'Done', onClick: () => { App.session = null; navigate('/'); } })
+      el('button', { class: 'btn-primary', style: 'width:100%', text: 'Done', onClick: finishAndExit })
     ]));
   }
 
@@ -641,7 +661,7 @@
 
     // Save active session if the user closes mid-shop.
     window.addEventListener('beforeunload', () => {
-      if (App.session && !App.session._completed && App.session.currentIndex < App.session.items.length) {
+      if (App.session) {
         Session.persist(App.session);
       }
     });
