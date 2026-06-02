@@ -1,6 +1,6 @@
 // Default seed list used before the user connects a Google Sheet.
 // Each item: { category, item, brand, quantity, unit }
-const DEFAULT_LIST = (function () {
+export const DEFAULT_LIST = (function () {
   const groups = {
     'Pantry & Dry Goods': [
       'Rice', 'Flour', 'Rice flour', 'Rathi/Anchor flour', 'Atta flour', 'Kadala flour',
