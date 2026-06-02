@@ -128,22 +128,13 @@ function renderItemsSection() {
     el('button', { class: 'btn-ghost ai-add', style: 'width:100%;margin-top:6px', html: '+ Add item', onClick: addItem })
   ]));
 
-  // Browseable list grouped by category, with per-row delete.
+  // Browseable list grouped by category, each row editable / deletable.
   const listWrap = el('div', { class: 'items-list' });
   cats.forEach(cat => {
     const inCat = list.filter(i => i.category === cat);
     if (!inCat.length) return;
     listWrap.appendChild(el('div', { class: 'cat-title', style: 'text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;margin:12px 0 4px', text: cat }));
-    inCat.forEach(item => {
-      listWrap.appendChild(el('div', { class: 'item-line' }, [
-        el('div', { class: 'il-name', text: item.item + (item.custom ? '' : '') }),
-        el('button', { class: 'il-del', 'aria-label': 'Delete ' + item.item, html: '×', onClick: () => {
-          if (item.custom) Storage.removeCustomItem(item.key);
-          else Storage.addDeletedItem(item.key);
-          renderItemsSection();
-        } })
-      ]));
-    });
+    inCat.forEach(item => listWrap.appendChild(itemLine(item, catOptions)));
   });
   wrap.appendChild(listWrap);
 
@@ -154,6 +145,85 @@ function renderItemsSection() {
     toast('Restored sheet defaults');
     renderItemsSection();
   } }));
+}
+
+// A single item row that flips between a view and a full inline editor
+// (name, category, brand, quantity, unit). Edits to sheet items are stored as
+// custom overrides; edits to custom items update them in place.
+function itemLine(item, catOptions) {
+  const line = el('div', { class: 'item-line' });
+
+  function viewMode() {
+    line.classList.remove('editing');
+    line.innerHTML = '';
+    const detail = [item.brand, item.quantity ? item.quantity + (item.unit ? ' ' + item.unit : '') : ''].filter(Boolean).join(' · ');
+    line.appendChild(el('div', { class: 'il-main' }, [
+      el('div', { class: 'il-name', text: item.item }),
+      el('div', { class: 'il-detail muted', text: detail })
+    ]));
+    line.appendChild(el('div', { class: 'il-btns' }, [
+      el('button', { class: 'il-edit', 'aria-label': 'Edit ' + item.item, html: '✎', onClick: editMode }),
+      el('button', { class: 'il-del', 'aria-label': 'Delete ' + item.item, html: '×', onClick: () => {
+        if (item.custom) Storage.removeCustomItem(item.key);
+        else Storage.addDeletedItem(item.key);
+        renderItemsSection();
+      } })
+    ]));
+  }
+
+  function editMode() {
+    line.classList.add('editing');
+    line.innerHTML = '';
+    const opts = catOptions.slice();
+    if (!opts.includes(item.category)) opts.unshift(item.category);
+    const catSel = el('select', { class: 'ie-cat', 'aria-label': 'Category' }, opts.map(c => el('option', { value: c, text: c })));
+    catSel.value = item.category;
+    const nameI = el('input', { type: 'text', class: 'ie-name', value: item.item, placeholder: 'Item name', 'aria-label': 'Item name' });
+    const brandI = el('input', { type: 'text', class: 'ie-brand', value: item.brand || '', placeholder: 'Brand', 'aria-label': 'Brand' });
+    const qtyI = el('input', { type: 'text', class: 'ie-qty', value: item.quantity || '', placeholder: 'Qty', inputmode: 'decimal', 'aria-label': 'Quantity' });
+    const unitI = el('input', { type: 'text', class: 'ie-unit', value: item.unit || '', placeholder: 'Unit', 'aria-label': 'Unit' });
+
+    line.appendChild(el('div', { class: 'ie-row' }, [ catSel, nameI ]));
+    line.appendChild(el('div', { class: 'ie-row' }, [ brandI, qtyI, unitI ]));
+    line.appendChild(el('div', { class: 'ie-actions' }, [
+      el('button', { class: 'btn-ghost', text: 'Cancel', onClick: viewMode }),
+      el('button', { class: 'btn-primary', text: 'Save', onClick: () => {
+        const name = nameI.value.trim();
+        if (!name) { nameI.focus(); return; }
+        saveEdit(item, { category: catSel.value || 'Other', name, brand: brandI.value.trim(), quantity: qtyI.value.trim(), unit: unitI.value.trim() });
+        renderItemsSection();
+      } })
+    ]));
+    nameI.focus();
+  }
+
+  viewMode();
+  return line;
+}
+
+// Persist an edit to an item. Stored as a custom item keyed by its (possibly
+// new) stable key, which overrides the sheet version at render time.
+function saveEdit(original, values) {
+  const updated = {
+    category: values.category,
+    item: values.name,
+    brand: values.brand,
+    quantity: values.quantity,
+    unit: values.unit
+  };
+  if (original.id) updated.id = original.id; // keep stable sheet id if present
+  const newKey = itemKey(updated);
+  updated.key = newKey;
+  const oldKey = original.key;
+
+  // Avoid duplicate custom entries for either key.
+  Storage.removeCustomItem(oldKey);
+  Storage.removeCustomItem(newKey);
+  // Renamed/recategorised a sheet item → hide the original so it can't reappear.
+  if (!original.custom && newKey !== oldKey) Storage.addDeletedItem(oldKey);
+  // Make sure the resulting key isn't being hidden.
+  Storage.removeDeletedItem(newKey);
+  Storage.addCustomItem(updated);
 }
 
 async function testConnection() {
