@@ -1,5 +1,5 @@
 // Thin wrappers over localStorage with JSON encoding and safe defaults.
-const Storage = (function () {
+export const Storage = (function () {
   const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_FC4DIk8tedSeP8XczQ2gOoFBbh42P6X8h4YdYA8XeI/edit?gid=0#gid=0';
   const KEYS = {
     settings: 'settings',
@@ -7,7 +7,9 @@ const Storage = (function () {
     prefill: 'prefill',
     sessions: 'sessions',
     activeSession: 'activeSession',
-    onboarded: 'onboarded'
+    onboarded: 'onboarded',
+    customItems: 'customItems',
+    deletedItems: 'deletedItems'
   };
 
   function read(key, fallback) {
@@ -74,6 +76,37 @@ const Storage = (function () {
 
     isOnboarded() { return read(KEYS.onboarded, false) === true; },
     setOnboarded() { write(KEYS.onboarded, true); },
+
+    // ----- Custom items (added by the user in Settings) -----
+    getCustomItems() { return read(KEYS.customItems, []); },
+    addCustomItem(item) {
+      const all = this.getCustomItems();
+      all.push(item);
+      write(KEYS.customItems, all);
+      return all;
+    },
+    removeCustomItem(key) {
+      const all = this.getCustomItems().filter(i => (i.key || ('name:' + (i.item || '').toLowerCase().trim())) !== key);
+      write(KEYS.customItems, all);
+      return all;
+    },
+
+    // ----- Deleted items (keys hidden from the master list) -----
+    getDeletedItems() { return read(KEYS.deletedItems, []); },
+    addDeletedItem(key) {
+      const all = this.getDeletedItems();
+      if (!all.includes(key)) { all.push(key); write(KEYS.deletedItems, all); }
+      return all;
+    },
+    removeDeletedItem(key) {
+      const all = this.getDeletedItems().filter(k => k !== key);
+      write(KEYS.deletedItems, all);
+      return all;
+    },
+    resetCustomisations() {
+      remove(KEYS.customItems);
+      remove(KEYS.deletedItems);
+    },
 
     clearCache() {
       remove(KEYS.cachedList);

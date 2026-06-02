@@ -1,5 +1,5 @@
 // Google Sheets CSV fetching and parsing.
-const Sheets = (function () {
+export const Sheets = (function () {
 
   // Robust CSV line splitter that respects quoted fields containing commas.
   function splitCSVLine(line) {
@@ -22,11 +22,35 @@ const Sheets = (function () {
     return out.map(s => s.trim());
   }
 
+  // Map a header row to column indices. Supports common aliases and an optional
+  // stable id column. Falls back to positional order when headers are unknown.
+  function columnMap(headerCols) {
+    const norm = headerCols.map(h => h.toLowerCase().replace(/[^a-z]/g, ''));
+    const find = (...aliases) => {
+      for (const a of aliases) { const i = norm.indexOf(a); if (i !== -1) return i; }
+      return -1;
+    };
+    const map = {
+      id: find('id', 'itemid', 'uid', 'key'),
+      category: find('category', 'cat', 'group'),
+      item: find('item', 'name', 'product'),
+      brand: find('brand', 'defaultbrand'),
+      quantity: find('quantity', 'qty', 'defaultquantity'),
+      unit: find('unit', 'units')
+    };
+    // If the header didn't look like ours at all, use positional defaults.
+    if (map.category === -1 && map.item === -1) {
+      return { id: -1, category: 0, item: 1, brand: 2, quantity: 3, unit: 4 };
+    }
+    return map;
+  }
+
   function parseCSV(text) {
     const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!clean) return [];
     const lines = clean.split('\n');
-    // Skip header row.
+    const map = columnMap(splitCSVLine(lines[0]));
+    const at = (cols, i) => (i >= 0 && cols[i] != null ? String(cols[i]).trim() : '');
     const rows = lines.slice(1);
     // Blank category cells inherit the category of the row above (sheets often
     // label only the first row of each group), falling back to 'Uncategorised'.
@@ -34,16 +58,18 @@ const Sheets = (function () {
     return rows
       .map(line => {
         const cols = splitCSVLine(line);
-        const [category, item, brand, quantity, unit] = cols;
-        const cat = (category || '').trim();
+        const cat = at(cols, map.category);
         if (cat) lastCategory = cat;
-        return {
+        const out = {
           category: cat || lastCategory,
-          item: (item || '').trim(),
-          brand: (brand || '').trim(),
-          quantity: (quantity || '').trim(),
-          unit: (unit || '').trim()
+          item: at(cols, map.item),
+          brand: at(cols, map.brand),
+          quantity: at(cols, map.quantity),
+          unit: at(cols, map.unit)
         };
+        const id = at(cols, map.id);
+        if (id) out.id = id;
+        return out;
       })
       .filter(r => r.item);
   }

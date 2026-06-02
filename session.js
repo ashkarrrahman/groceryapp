@@ -1,14 +1,29 @@
 // Shopping session state and item-stepping logic.
-const Session = (function () {
+import { Storage } from './storage.js';
+
+export const Session = (function () {
 
   function todayISO() { return new Date().toISOString(); }
   function todayDate() { return new Date().toISOString().slice(0, 10); }
 
+  // Scale a quantity string by a numeric multiplier, preserving non-numeric text.
+  function scaleQty(qty, mult) {
+    if (!qty || !mult || mult === 1) return qty;
+    const m = String(qty).match(/^\s*(\d+(?:\.\d+)?)(.*)$/);
+    if (!m) return qty;
+    const n = parseFloat(m[1]) * mult;
+    const text = (Math.round(n * 100) / 100).toString();
+    return text + m[2];
+  }
+
   // Build a fresh session from a list, optionally pre-seeding values from a template.
+  // Template entries may carry `_mult` (a per-category quantity multiplier) which
+  // scales the default quantity for this session only (never written to prefill).
   function create(list, template) {
     const prefill = Storage.getPrefill();
     const items = list.map(src => {
       const base = {
+        id: src.id || undefined,
         category: src.category,
         item: src.item,
         brand: src.brand || '',
@@ -27,11 +42,18 @@ const Session = (function () {
         base.unit = source.unit || base.unit;
         base.prefilled = true;
       }
+      // Apply per-category multiplier from a template, if any.
+      if (tpl && tpl._mult && tpl._mult !== 1) {
+        base._baseQty = base.quantity;       // remember unscaled value for prefill
+        base.quantity = scaleQty(base.quantity, tpl._mult);
+        base._noPrefillQty = true;           // don't persist the scaled qty
+      }
       return base;
     });
     return {
       startedAt: todayISO(),
       currentCategory: 0,
+      visited: [0],
       items
     };
   }
@@ -58,7 +80,11 @@ const Session = (function () {
     // Update prefill memory from successfully entered items.
     session.items.forEach(i => {
       if (i.status === 'done' && (i.brand || i.quantity)) {
-        Storage.updatePrefill(i.item, i);
+        if (i._noPrefillQty) {
+          Storage.updatePrefill(i.item, { brand: i.brand, quantity: i._baseQty || '', unit: i.unit });
+        } else {
+          Storage.updatePrefill(i.item, i);
+        }
       }
     });
     const record = {
@@ -74,5 +100,5 @@ const Session = (function () {
     return record;
   }
 
-  return { create, categoriesOf, visibleItems, persist, complete, todayDate, todayISO };
+  return { create, categoriesOf, visibleItems, persist, complete, todayDate, todayISO, scaleQty };
 })();

@@ -1,5 +1,5 @@
 // WhatsApp sharing and printing of the final list.
-const Share = (function () {
+export const Share = (function () {
 
   function formatDate(dateStr) {
     const d = dateStr ? new Date(dateStr) : new Date();
