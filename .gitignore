@@ -1,5 +1,8 @@
 .DS_Store
 *.log
 
+# Test toolchain
+node_modules/
+
 # Local preview tooling (machine-specific paths)
 .claude/

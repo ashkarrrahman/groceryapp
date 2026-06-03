@@ -1,0 +1,25 @@
+name: Tests
+
+# Run on PRs targeting main (gates the merge when branch protection is on)
+# and on direct pushes to main (post-merge safety net).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run unit tests
+        run: npm test
