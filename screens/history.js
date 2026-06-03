@@ -43,6 +43,7 @@ export function showHistory() {
     card.appendChild(head);
 
     const body = el('div', { class: 'hc-body' });
+    body.appendChild(el('div', { class: 'mult-hint muted', text: 'Tap ×0.5 / ×1 / ×2 on a category to scale its quantities when reusing.' }));
     cats.forEach(cat => {
       // Category header with multiplier chips.
       const chips = el('div', { class: 'mult-chips' });

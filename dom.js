@@ -20,12 +20,34 @@ export function el(tag, props, children) {
 
 let toastTimer;
 export function toast(msg) {
-  let t = $('#toast');
-  if (!t) { t = el('div', { id: 'toast' }); document.body.appendChild(t); }
+  const t = ensureToast();
+  t.classList.remove('has-action');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Toast with an "Undo" button. `onUndo` runs if tapped before it dismisses.
+export function toastUndo(msg, onUndo, ms) {
+  const t = ensureToast();
+  t.classList.add('has-action');
+  t.innerHTML = '';
+  t.appendChild(el('span', { class: 'toast-msg', text: msg }));
+  const btn = el('button', { class: 'toast-undo', text: 'Undo' });
+  let done = false;
+  const dismiss = () => { clearTimeout(toastTimer); t.classList.remove('show', 'has-action'); };
+  btn.addEventListener('click', () => { if (done) return; done = true; dismiss(); onUndo(); });
+  t.appendChild(btn);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(dismiss, ms || 5000);
+}
+
+function ensureToast() {
+  let t = $('#toast');
+  if (!t) { t = el('div', { id: 'toast' }); document.body.appendChild(t); }
+  return t;
 }
 
 export function fmtDate(d) {

@@ -1,5 +1,5 @@
 // Review screen: inline-editable items + freeform quick-add, before sharing.
-import { $, el, toast } from '../dom.js';
+import { $, el, toast, toastUndo } from '../dom.js';
 import { App } from '../state.js';
 import { navigate, setScreen } from '../router.js';
 import { Storage } from '../storage.js';
@@ -25,6 +25,7 @@ export function showSummary() {
     ])
   ]));
 
+  screen.appendChild(el('div', { class: 'summary-hint muted', text: 'Tap any item to edit it · add extras below' }));
   screen.appendChild(el('div', { id: 'summary-body' }));
   renderBody();
 
@@ -55,7 +56,8 @@ export function showSummary() {
       el('button', { class: 'btn-ghost', style: 'width:100%', text: '← Edit list', onClick: editList }),
       el('button', { class: 'btn-green', html: '\u{1F7E2} Share via WhatsApp', onClick: () => Share.shareList(Session.visibleItems(session.items), dateStr) }),
       el('button', { class: 'btn-ghost', style: 'width:100%', html: '\u{1F5A8} Print', onClick: () => Share.printList() }),
-      el('button', { class: 'btn-primary', style: 'width:100%', text: 'Done', onClick: finishAndExit })
+      el('button', { class: 'btn-primary', style: 'width:100%', text: 'Done · save to history', onClick: finishAndExit }),
+      el('div', { class: 'muted', style: 'font-size:12px;text-align:center', text: 'Sharing or printing won’t end the shop — tap Done to save it to History.' })
     ]));
   }
 
@@ -70,7 +72,10 @@ export function showSummary() {
       const qty = item.quantity ? (item.quantity + (item.unit ? ' ' + item.unit : '')) : '';
       const detail = [item.brand, qty].filter(Boolean).join(' · ');
       row.appendChild(el('div', { class: 'name', text: item.item }));
-      row.appendChild(el('div', { class: 'detail', text: detail || 'Tap to add detail' }));
+      row.appendChild(el('div', { class: 'si-right' }, [
+        el('div', { class: 'detail', text: detail || 'Tap to add detail' }),
+        el('span', { class: 'edit-hint', html: '✎', 'aria-hidden': 'true' })
+      ]));
       row.onclick = showEdit;
     }
 
@@ -97,9 +102,15 @@ export function showSummary() {
       row.appendChild(el('div', { class: 'se-actions' }, [
         el('button', { class: 'btn-ghost se-remove', text: 'Remove', onClick: (e) => {
           if (e) e.stopPropagation();
+          const prevStatus = item.status;
           item.status = 'skipped';
           Session.persist(session);
           renderBody();
+          toastUndo('Removed ' + item.item, () => {
+            item.status = prevStatus;
+            Session.persist(session);
+            renderBody();
+          });
         } }),
         el('button', { class: 'btn-primary se-save', text: 'Save', onClick: save })
       ]));

@@ -1,5 +1,5 @@
 // Shopping flow: category-at-a-time with a tappable category stepper.
-import { $, el } from '../dom.js';
+import { $, el, toast, toastUndo } from '../dom.js';
 import { App } from '../state.js';
 import { navigate, setScreen } from '../router.js';
 import { Storage } from '../storage.js';
@@ -181,8 +181,10 @@ function nextCategory() {
 
 function prevCategory() {
   const session = App.session;
+  // Always save the current category's edits first (Back on the first
+  // category used to discard them silently before exiting).
   saveCurrentCategory();
-  if (session.currentCategory === 0) { pauseSession(true); return; }
+  if (session.currentCategory === 0) { pauseSession(); return; }
   session.currentCategory--;
   Session.persist(session);
   renderCategory('in-left');
@@ -192,17 +194,27 @@ function skipCategory() {
   const session = App.session;
   const cats = Session.categoriesOf(session.items);
   const cat = cats[session.currentCategory];
+  const fromCat = session.currentCategory;
+  // Remember prior statuses so the skip can be undone.
+  const prev = session.items.map(it => it.category === cat ? it.status : null);
   session.items.forEach(it => { if (it.category === cat) it.status = 'skipped'; });
   session.currentCategory++;
   Session.persist(session);
+  toastUndo('Skipped ' + cat, () => {
+    session.items.forEach((it, i) => { if (prev[i] !== null) it.status = prev[i]; });
+    session.currentCategory = fromCat;
+    Session.persist(session);
+    renderCategory('in-left');
+  });
   if (session.currentCategory >= cats.length) { finishSession(); return; }
   renderCategory('in-right');
 }
 
-function pauseSession(skipSave) {
+function pauseSession() {
   const session = App.session;
-  if (!skipSave) saveCurrentCategory();
+  saveCurrentCategory();
   Session.persist(session);
+  toast('Session saved');
   navigate('/');
 }
 
