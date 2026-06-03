@@ -87,10 +87,11 @@ function renderItemsSection() {
   if (!wrap) return;
   wrap.innerHTML = '';
 
-  wrap.appendChild(el('label', { text: 'Your items', style: 'display:block;text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;letter-spacing:.06em;margin-bottom:8px' }));
-
   const list = getMasterList();
   const cats = Session.categoriesOf(list);
+
+  wrap.appendChild(el('label', { text: 'Your items · ' + list.length, style: 'display:block;text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;letter-spacing:.06em;margin-bottom:8px' }));
+
   const catOptions = cats.slice();
   if (!catOptions.includes('Other')) catOptions.push('Other');
 
