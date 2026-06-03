@@ -6,7 +6,10 @@ import { Storage } from '../storage.js';
 import { Sheets } from '../sheets.js';
 import { Session } from '../session.js';
 
+let itemFilter = ''; // current search term for the items list
+
 export function showSettings() {
+  itemFilter = ''; // reset search each time Settings opens
   const screen = setScreen('screen-settings');
   screen.innerHTML = '';
   const settings = Storage.getSettings();
@@ -17,10 +20,11 @@ export function showSettings() {
     el('div', { style: 'width:44px' })
   ]));
 
-  // Name.
+  // Name (auto-saves on blur, like theme and item edits).
   screen.appendChild(el('div', { class: 'settings-section field' }, [
     el('label', { text: 'Your name', for: 'set-name' }),
-    el('input', { type: 'text', id: 'set-name', value: settings.userName || '', placeholder: 'Your name' })
+    el('input', { type: 'text', id: 'set-name', value: settings.userName || '', placeholder: 'Your name',
+      onBlur: e => Storage.saveSettings({ userName: e.target.value.trim() }) })
   ]));
 
   // Sheet URL.
@@ -58,12 +62,14 @@ export function showSettings() {
     themeRow
   ]));
 
-  // Save button.
-  screen.appendChild(el('button', { class: 'btn-primary', style: 'margin-bottom:22px', text: 'Save', onClick: () => {
+  // Save button — its real job is applying the sheet URL and re-fetching.
+  // Name, theme and item edits already save automatically.
+  screen.appendChild(el('button', { class: 'btn-primary', text: 'Save sheet URL & refresh', onClick: () => {
     Storage.saveSettings({ userName: $('#set-name').value.trim(), sheetUrl: $('#set-url').value.trim() });
     toast('Settings saved');
     refreshFromSheet({ toast: false }).then(() => navigate('/'));
   } }));
+  screen.appendChild(el('div', { class: 'muted', style: 'font-size:12px;margin:8px 0 22px;text-align:center', text: 'Your name, theme and item edits save automatically.' }));
 
   // Custom items management.
   screen.appendChild(el('div', { class: 'settings-section', id: 'items-section' }));
@@ -129,15 +135,30 @@ function renderItemsSection() {
     el('button', { class: 'btn-ghost ai-add', style: 'width:100%;margin-top:6px', html: '+ Add item', onClick: addItem })
   ]));
 
+  // Search box (filters the list as you type; survives edits/deletes).
+  const search = el('input', { type: 'search', class: 'item-search', placeholder: 'Search items…', 'aria-label': 'Search items', value: itemFilter });
+  search.addEventListener('input', () => { itemFilter = search.value; paint(); });
+  wrap.appendChild(search);
+
   // Browseable list grouped by category, each row editable / deletable.
   const listWrap = el('div', { class: 'items-list' });
-  cats.forEach(cat => {
-    const inCat = list.filter(i => i.category === cat);
-    if (!inCat.length) return;
-    listWrap.appendChild(el('div', { class: 'cat-title', style: 'text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;margin:12px 0 4px', text: cat }));
-    inCat.forEach(item => listWrap.appendChild(itemLine(item, catOptions)));
-  });
   wrap.appendChild(listWrap);
+
+  function paint() {
+    const term = itemFilter.trim().toLowerCase();
+    listWrap.innerHTML = '';
+    let shown = 0;
+    cats.forEach(cat => {
+      const inCat = list.filter(i => i.category === cat && (!term ||
+        i.item.toLowerCase().includes(term) || (i.brand || '').toLowerCase().includes(term)));
+      if (!inCat.length) return;
+      shown += inCat.length;
+      listWrap.appendChild(el('div', { class: 'cat-title', style: 'text-transform:uppercase;color:var(--primary);font-size:11px;font-weight:600;margin:12px 0 4px', text: cat }));
+      inCat.forEach(item => listWrap.appendChild(itemLine(item, catOptions)));
+    });
+    if (!shown) listWrap.appendChild(el('div', { class: 'muted', style: 'padding:16px 0;text-align:center', text: 'No items match “' + itemFilter.trim() + '”' }));
+  }
+  paint();
 
   // Reset customisations.
   wrap.appendChild(el('button', { class: 'btn-ghost', style: 'width:100%;margin-top:12px', text: 'Reset to sheet defaults', onClick: () => {
