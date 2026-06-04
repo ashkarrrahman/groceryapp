@@ -4,6 +4,8 @@ import { App } from '../state.js';
 import { navigate, setScreen } from '../router.js';
 import { Storage } from '../storage.js';
 import { Session } from '../session.js';
+import { STATUS } from '../keys.js';
+import { fieldInputs } from '../ui.js';
 
 export function showShop() {
   if (!App.session) {
@@ -117,31 +119,31 @@ function renderCategory(animClass) {
 }
 
 function renderItemRow(item, idx) {
-  const include = item.status === 'done' || (item.status === 'pending' && item.prefilled);
+  const include = item.status === STATUS.DONE || (item.status === STATUS.PENDING && item.prefilled);
 
   const checkbox = el('input', { type: 'checkbox', class: 'ci-include', 'aria-label': 'Include ' + item.item });
   if (include) checkbox.checked = true;
 
   // Prefilled fields get an amber left border + a "from last shop" hint on focus.
-  const pfBrand = item.prefilled && item.brand ? ' prefilled' : '';
-  const pfQty = item.prefilled && item.quantity ? ' prefilled' : '';
-  const pfUnit = item.prefilled && item.unit ? ' prefilled' : '';
-  const brand = el('input', { type: 'text', class: 'ci-brand' + pfBrand, value: item.brand || '', placeholder: 'Brand', 'aria-label': item.item + ' brand' });
-  const qty = el('input', { type: 'text', class: 'ci-qty' + pfQty, value: item.quantity || '', placeholder: 'Qty', inputmode: 'decimal', 'aria-label': item.item + ' quantity' });
-  const unit = el('input', { type: 'text', class: 'ci-unit' + pfUnit, value: item.unit || '', placeholder: 'Unit', 'aria-label': item.item + ' unit' });
+  const { brand, qty, unit, row: fields } = fieldInputs(item, { prefilled: true });
 
   const row = el('div', { class: 'cat-item' }, [
     el('div', { class: 'ci-top' }, [
       checkbox,
       el('div', { class: 'ci-name', text: item.item })
     ]),
-    el('div', { class: 'ci-fields' }, [ brand, qty, unit ]),
+    fields,
     el('div', { class: 'ci-fromlast', text: 'from last shop' })
   ]);
   row.dataset.idx = String(idx);
 
+  // Bind inputs to the model on input, so the session object — not the DOM — is
+  // the source of truth for entered values. Typing also auto-includes the item.
+  brand.addEventListener('input', () => { item.brand = brand.value.trim(); checkbox.checked = true; });
+  qty.addEventListener('input', () => { item.quantity = qty.value.trim(); checkbox.checked = true; });
+  unit.addEventListener('input', () => { item.unit = unit.value.trim(); checkbox.checked = true; });
+
   [brand, qty, unit].forEach(inp => {
-    inp.addEventListener('input', () => { checkbox.checked = true; });
     if (inp.classList.contains('prefilled')) {
       inp.addEventListener('focus', () => row.classList.add('show-fromlast'));
       inp.addEventListener('blur', () => row.classList.remove('show-fromlast'));
@@ -153,18 +155,17 @@ function renderItemRow(item, idx) {
 
 function saveCurrentCategory() {
   const session = App.session;
+  // Brand/qty/unit are already bound to the model on input; the only thing the
+  // DOM still owns here is the include toggle, which maps to item status.
   document.querySelectorAll('.cat-item').forEach(row => {
     const i = +row.dataset.idx;
     const item = session.items[i];
     if (!item) return;
-    item.brand = row.querySelector('.ci-brand').value.trim();
-    item.quantity = row.querySelector('.ci-qty').value.trim();
-    item.unit = row.querySelector('.ci-unit').value.trim();
     if (row.querySelector('.ci-include').checked) {
-      item.status = 'done';
-      Storage.updatePrefill(item.item, item._noPrefillQty ? { brand: item.brand, quantity: item._baseQty || '', unit: item.unit } : item);
+      item.status = STATUS.DONE;
+      Storage.updatePrefill(item, item._noPrefillQty ? { brand: item.brand, quantity: item._baseQty || '', unit: item.unit } : item);
     } else {
-      item.status = 'skipped';
+      item.status = STATUS.SKIPPED;
     }
   });
 }
@@ -197,7 +198,7 @@ function skipCategory() {
   const fromCat = session.currentCategory;
   // Remember prior statuses so the skip can be undone.
   const prev = session.items.map(it => it.category === cat ? it.status : null);
-  session.items.forEach(it => { if (it.category === cat) it.status = 'skipped'; });
+  session.items.forEach(it => { if (it.category === cat) it.status = STATUS.SKIPPED; });
   session.currentCategory++;
   Session.persist(session);
   toastUndo('Skipped ' + cat, () => {

@@ -5,6 +5,7 @@ import { navigate, setScreen } from '../router.js';
 import { Storage } from '../storage.js';
 import { Session } from '../session.js';
 import { Share } from '../share.js';
+import { STATUS } from '../keys.js';
 
 export function showWelcome() {
   const screen = setScreen('screen-welcome');
@@ -57,7 +58,7 @@ export function showWelcome() {
 
   const active = Storage.getActiveSession();
   if (active) {
-    const done = active.items.filter(i => i.status !== 'pending').length;
+    const done = active.items.filter(i => i.status !== STATUS.PENDING).length;
     screen.appendChild(el('div', { class: 'session-card' }, [
       el('div', { class: 'row' }, [
         el('div', {}, [

@@ -5,6 +5,8 @@ import { navigate, setScreen } from '../router.js';
 import { Storage } from '../storage.js';
 import { Session } from '../session.js';
 import { Share } from '../share.js';
+import { STATUS } from '../keys.js';
+import { fieldInputs } from '../ui.js';
 
 export function showSummary() {
   // Allow finishing either the live session or a just-completed one.
@@ -83,9 +85,7 @@ export function showSummary() {
       row.classList.add('editing');
       row.onclick = null;
       row.innerHTML = '';
-      const brand = el('input', { type: 'text', class: 'ci-brand', value: item.brand || '', placeholder: 'Brand', 'aria-label': item.item + ' brand' });
-      const qty = el('input', { type: 'text', class: 'ci-qty', value: item.quantity || '', placeholder: 'Qty', inputmode: 'decimal', 'aria-label': item.item + ' quantity' });
-      const unit = el('input', { type: 'text', class: 'ci-unit', value: item.unit || '', placeholder: 'Unit', 'aria-label': item.item + ' unit' });
+      const { brand, qty, unit, row: fields } = fieldInputs(item);
 
       function save(e) {
         if (e) e.stopPropagation();
@@ -93,17 +93,17 @@ export function showSummary() {
         item.quantity = qty.value.trim();
         item.unit = unit.value.trim();
         Session.persist(session);
-        Storage.updatePrefill(item.item, item._noPrefillQty ? { brand: item.brand, quantity: item._baseQty || '', unit: item.unit } : item);
+        Storage.updatePrefill(item, item._noPrefillQty ? { brand: item.brand, quantity: item._baseQty || '', unit: item.unit } : item);
         showView();
       }
 
       row.appendChild(el('div', { class: 'se-name', text: item.item }));
-      row.appendChild(el('div', { class: 'ci-fields' }, [ brand, qty, unit ]));
+      row.appendChild(fields);
       row.appendChild(el('div', { class: 'se-actions' }, [
         el('button', { class: 'btn-ghost se-remove', text: 'Remove', onClick: (e) => {
           if (e) e.stopPropagation();
           const prevStatus = item.status;
-          item.status = 'skipped';
+          item.status = STATUS.SKIPPED;
           Session.persist(session);
           renderBody();
           toastUndo('Removed ' + item.item, () => {
@@ -136,7 +136,7 @@ export function showSummary() {
         quantity: qtyInput.value.trim(),
         unit: '',
         note: '',
-        status: 'done'
+        status: STATUS.DONE
       });
       Session.persist(session);
       nameInput.value = '';

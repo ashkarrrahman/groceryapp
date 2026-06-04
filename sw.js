@@ -2,7 +2,7 @@
 //  - App shell (HTML/CSS/JS/icons): stale-while-revalidate.
 //  - Google Sheet CSV: network-first with cache fallback (app also keeps a
 //    localStorage copy; a bad/empty response never overwrites a good cache).
-const CACHE_NAME = 'grocery-v2';
+const CACHE_NAME = 'grocery-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,8 @@ const STATIC_ASSETS = [
   './state.js',
   './dom.js',
   './data.js',
+  './keys.js',
+  './ui.js',
   './storage.js',
   './sheets.js',
   './session.js',

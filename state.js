@@ -4,6 +4,11 @@ import { Sheets } from './sheets.js';
 import { DEFAULT_LIST } from './data.js';
 import { toast } from './dom.js';
 import { currentPath, render } from './router.js';
+import { itemKey } from './keys.js';
+
+// Re-exported so existing importers (`import { itemKey } from './state.js'`)
+// keep working; the canonical definition now lives in keys.js.
+export { itemKey };
 
 export const App = {
   list: null,            // raw item list (from sheet cache or seed defaults)
@@ -11,12 +16,6 @@ export const App = {
   session: null,         // active shopping session
   pendingTemplate: null  // template values when starting from history
 };
-
-// Stable key for an item: prefer a sheet id so renamed items don't resurrect.
-export function itemKey(item) {
-  if (item && item.id) return 'id:' + item.id;
-  return 'name:' + ((item && item.item) || '').toLowerCase().trim();
-}
 
 // Load the raw list (sheet cache → seed) into App.list once.
 export function ensureList() {

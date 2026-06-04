@@ -6,6 +6,7 @@ import { Storage } from '../storage.js';
 import { Session } from '../session.js';
 import { Share } from '../share.js';
 import { startSession } from './home.js';
+import { itemKey, STATUS } from '../keys.js';
 
 const MULTIPLIERS = [0.5, 1, 2];
 
@@ -78,8 +79,9 @@ export function showHistory() {
       el('button', { class: 'template-btn', text: 'Use as template', onClick: () => {
         const tpl = {};
         s.items.forEach(i => {
-          if (i.status === 'done') {
-            tpl[i.item] = { brand: i.brand, quantity: i.quantity, unit: i.unit, _mult: mults[i.category] || 1 };
+          if (i.status === STATUS.DONE) {
+            // Keyed by stable identity so it lines up with Session.create's lookup.
+            tpl[itemKey(i)] = { brand: i.brand, quantity: i.quantity, unit: i.unit, _mult: mults[i.category] || 1 };
           }
         });
         App.pendingTemplate = tpl;
